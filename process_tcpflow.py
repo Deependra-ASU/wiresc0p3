@@ -32,28 +32,36 @@ def extract_port_numbers(file_name):
 
 def process_request_file(root_dir, file_name):
     fq_file_name = os.path.join(root_dir, file_name)
-    requests = []
-    ri = -1
+    http_requests = []
     with open(fq_file_name, 'r') as f:
         content = f.read()
         lines = content.splitlines()
+        req_body = ''
         for line in lines:
+            # append new requests to the end of the list
+            req_idx = len(http_requests) - 1
             if len(line) > 0:
-                print(f'processing line: {line}')
-                all_matches = re.finditer("(GET|HEAD|POST|PUT|DELETE) (/?/?)[^\\s]+ HTTP/.*", line)
-                match_count = 0
-                for match in all_matches:
-                    match_count += 1
-                    if match.start(0) > 0:
-                        requests[ri]['request_line'] = line[:match.start(0)]
-                        requests.append({'request_header': line[match.start(0):]})
-                        ri = len(requests) - 1
-                if match_count == 0:
-                    requests[ri]['request_headers'] = line
+                http_header_matches = re.finditer("(GET|HEAD|POST|PUT|DELETE) /", line)
+                http_header_found = False
+                header_found_index = 0
+                # request line which contains the http method marks the beginning of the request
+                for http_header_match in http_header_matches:
+                    http_header_found = True
+                    header_found_index = http_header_match.start(0)
+                if http_header_found:
+                    # handle requests where http method is not at index 0 of line
+                    if header_found_index > 0:
+                        req_body = line[:header_found_index]
+                        http_requests.append({'request': line[header_found_index:]})
+                    else:
+                        http_requests.append({'request': line})
                 else:
-                    requests.append({'request_line': line})
-                    ri = len(requests) - 1
-    return requests
+                    req_body = line
+            if ':' in req_body:
+                http_requests[req_idx]['headers'] = req_body
+            else:
+                http_requests[req_idx]['payload'] = req_body
+    return http_requests
 
 
 def process_response_file(root_dir, file_name):
@@ -68,10 +76,10 @@ def extract_http_interaction(root_dir, file_name):
         if str(from_port) in watch_ports:
             process_response_file(root_dir, file_name)
         if str(to_port) in watch_ports:
-            # print(f'processing request file: {file_name}')
+            print(f'processing request file: {file_name}')
             reqs = process_request_file(root_dir, file_name)
-            # for req in reqs:
-            #     print(f'request: {req}')
+            for req in reqs:
+                print(f'request: {req}')
 
 
 def main():
