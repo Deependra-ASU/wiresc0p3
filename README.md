@@ -1,7 +1,17 @@
 # Wiresc0p3
 
-To capture pcap file we can use either wireshark or tcpdump. To use tcpdump run the following
-command: `sudo tcpdump -s 65535 -w ${HERE}/analyze/output-%s -G 15 -Z root`
-To capture tcpflow run the following command: `tcpflow -o outdir -Fk -r analyze/output_00001_20210206152809`
+Setup:
 
-To get `file` command capability: https://github.com/ahupp/python-magic
+- List active interfaces: `netstat -i`
+- Capture traffic using tcpdump: `sudo tcpdump -i <interface> -s 65535 -w ${HERE}/analyze/capture-%s -G 15 -Z <user>`
+- Capture tcpflow from tcpdump: `tcpflow -o outdir -Fk -r analyze/output_00001_20210206152809`
+
+Test applications:
+
+- Start sample web application: `docker run --name webapp --rm -itd -p 8090:80 vulnerables/web-dvwa`
+- Stop sample web application: `docker stop webapp`
+- Look at the logs of the docker: `docker logs webapp`
+
+Python libraries:
+
+- To get `file` command capability: https://github.com/ahupp/python-magic
