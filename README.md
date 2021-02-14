@@ -4,7 +4,7 @@ Setup:
 
 - List active interfaces: `netstat -i`
 - Capture traffic using tcpdump: `sudo tcpdump -i <interface> -s 65535 -w ${HERE}/analyze/capture-%s -G 15 -Z <user>`
-- Capture tcpflow from tcpdump: `tcpflow -o outdir -Fk -r analyze/output_00001_20210206152809`
+- Capture tcpflow from tcpdump: `./tcp_flow.sh`
 
 Test applications:
 

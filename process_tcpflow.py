@@ -3,6 +3,7 @@
 import os
 import re
 
+# list all the server ports that we want to watch
 watch_ports = ['8090']
 
 curr_dir = os.path.dirname(os.path.realpath(__file__))
@@ -32,6 +33,7 @@ def extract_port_numbers(file_name):
 
 def process_request_file(root_dir, file_name):
     fq_file_name = os.path.join(root_dir, file_name)
+    print(f'processing request file: {fq_file_name}')
     http_requests = []
     with open(fq_file_name, 'r') as f:
         content = f.read()
@@ -65,7 +67,35 @@ def process_request_file(root_dir, file_name):
 
 
 def process_response_file(root_dir, file_name):
-    pass
+    fq_file_name = os.path.join(root_dir, file_name)
+    print(f'processing response file {fq_file_name}...')
+    http_responses = []
+    if not fq_file_name.endswith('.html'):
+        with open(fq_file_name, 'rb') as f:
+            content = f.read()
+            lines = content.splitlines()
+            for line in lines:
+                res_idx = len(http_responses) - 1
+                try:
+                    str_line = line.decode()
+                    if 'HTTP/1.1' in str_line:
+                        idx = str_line.index('HTTP/1.1')
+                        if idx > 0:
+                            http_responses[res_idx]['response_headers'] += str_line[:idx]
+                        http_responses.append(
+                            {'response_code': str_line[idx:], 'response_headers': '', 'response_bytes': ''})
+                    else:
+                        http_responses[res_idx]['response_headers'] += str_line
+                except UnicodeDecodeError as ude:
+                    if b'HTTP/1.1' in line:
+                        idx = line.index(b'HTTP/1.1')
+                        if idx > 0:
+                            http_responses[res_idx]['response_bytes'] += str(line[:idx])
+                        http_responses.append(
+                            {'response_code': line[idx:].decode(), 'response_headers': '', 'response_bytes': ''})
+                    else:
+                        http_responses[res_idx]['response_bytes'] += str(line)
+    return http_responses
 
 
 def extract_http_interaction(root_dir, file_name):
@@ -74,12 +104,13 @@ def extract_http_interaction(root_dir, file_name):
     if len(filtered_ports) > 0:
         from_port, to_port = extract_port_numbers(file_name)
         if str(from_port) in watch_ports:
-            process_response_file(root_dir, file_name)
+            responses = process_response_file(root_dir, file_name)
+            for resp in responses:
+                print(resp)
         if str(to_port) in watch_ports:
-            print(f'processing request file: {file_name}')
             reqs = process_request_file(root_dir, file_name)
             for req in reqs:
-                print(f'request: {req}')
+                print(req)
 
 
 def main():
