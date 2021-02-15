@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import re
+import process_tcpflow_filter
 
 # list all the server ports that we want to watch
 watch_ports = ['8090']
@@ -70,7 +71,7 @@ def process_response_file(root_dir, file_name):
     fq_file_name = os.path.join(root_dir, file_name)
     print(f'processing response file {fq_file_name}...')
     http_responses = []
-    if not fq_file_name.endswith('.html'):
+    if not fq_file_name.endswith('.html') and not fq_file_name.endswith('.txt'):
         with open(fq_file_name, 'rb') as f:
             content = f.read()
             lines = content.splitlines()
@@ -105,10 +106,12 @@ def extract_http_interaction(root_dir, file_name):
         from_port, to_port = extract_port_numbers(file_name)
         if str(from_port) in watch_ports:
             responses = process_response_file(root_dir, file_name)
+            process_tcpflow_filter.filter(responses, from_port, False)
             for resp in responses:
                 print(resp)
         if str(to_port) in watch_ports:
             reqs = process_request_file(root_dir, file_name)
+            process_tcpflow_filter.filter(reqs, to_port, True)
             for req in reqs:
                 print(req)
 

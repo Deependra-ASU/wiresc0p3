@@ -18,7 +18,7 @@ def get_epoch_seconds(filename):
 def analyze_pcap(filename, log_files):
     print('analyzing file ' + filename + '\n')
     try:
-        pkts = rdpcap('analyze/' + filename)
+        pkts = rdpcap('out/tcpdump/' + filename)
         for pkt in pkts:
             # if Raw in pkt:
             #     raw = pkt[Raw]
@@ -40,7 +40,7 @@ def analyze_pcap(filename, log_files):
                     if tcpdump_filter.filter_payload(payload, portnum, isIncoming):
                         log_files[portnum].write(str(payload))
                         log_files[portnum].write('\n----------------------------\n')
-        os.rename('analyze/' + filename, 'archive/' + filename)
+        os.rename('out/tcpdump/' + filename, 'archive/' + filename)
     except(FileNotFoundError, IOError, Scapy_Exception):
         print('Failed to process pcap file (might be empty)')
 
@@ -63,7 +63,7 @@ def main():
     
     while True:
         current_time = time.time()
-        for filename in os.listdir('analyze'):
+        for filename in os.listdir('out/tcpdump'):
             ctime = get_epoch_seconds(filename)
             if current_time - ctime > 30:
                 analyze_pcap(filename, log_files)

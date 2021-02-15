@@ -3,8 +3,13 @@
 Setup:
 
 - List active interfaces: `netstat -i`
-- Capture traffic using tcpdump: `sudo tcpdump -i <interface> -s 65535 -w ${HERE}/analyze/capture-%s -G 15 -Z <user>`
-- Capture tcpflow from tcpdump: `./tcp_flow.sh`
+- Capture/Filter traffic using tcpdump:
+-    `sudo tcpdump -i <interface> -s 65535 -w ${HERE}/out/tcpdump/capture-%s -G 15 -Z <user>`
+-    `python3 ./process_tcpdump.py [<portnum1>,<portnum2>,...]`
+-    
+- Capture tcpflow from tcpdump:
+-    `sudo tcpdump -s 65535 -w out/tcpdump/output.pcap -C 1 -W 2 -Z root`
+-    `./tcp_flow.sh`
 
 Test applications:
 
