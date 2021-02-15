@@ -5,22 +5,10 @@ import re
 import process_tcpflow_filter
 
 # list all the server ports that we want to watch
-watch_ports = ['8090']
+watch_server_ports = ['8090']
 
 curr_dir = os.path.dirname(os.path.realpath(__file__))
 flow_root_dir = f'{curr_dir}/out/tcpflow'
-
-
-def construct_response_file_name(fname):
-    fname_segments = fname.split("-")
-    opt_suffix = ''
-    # handle cases where the file name contains suffixes like c1, c2, etc
-    if 'c' in fname_segments[1]:
-        split_suffix = fname_segments[1].split('c')
-        fname_segments[1] = split_suffix[0]
-        opt_suffix = 'c' + split_suffix[1]
-    resp_file_name = f'{fname_segments[1]}-{fname_segments[0]}{opt_suffix}'
-    return resp_file_name
 
 
 def extract_port_numbers(file_name):
@@ -34,7 +22,7 @@ def extract_port_numbers(file_name):
 
 def process_request_file(root_dir, file_name):
     fq_file_name = os.path.join(root_dir, file_name)
-    print(f'processing request file: {fq_file_name}')
+    print(f'processing request file: {file_name}')
     http_requests = []
     with open(fq_file_name, 'r') as f:
         content = f.read()
@@ -55,9 +43,9 @@ def process_request_file(root_dir, file_name):
                     # handle requests where http method is not at index 0 of line
                     if header_found_index > 0:
                         req_body = line[:header_found_index]
-                        http_requests.append({'request': line[header_found_index:]})
+                        http_requests.append({'request_line': line[header_found_index:]})
                     else:
-                        http_requests.append({'request': line})
+                        http_requests.append({'request_line': line})
                 else:
                     req_body = line
             if ':' in req_body:
@@ -69,57 +57,88 @@ def process_request_file(root_dir, file_name):
 
 def process_response_file(root_dir, file_name):
     fq_file_name = os.path.join(root_dir, file_name)
-    print(f'processing response file {fq_file_name}...')
+    print(f'processing response file {file_name}...')
     http_responses = []
-    if not fq_file_name.endswith('.html') and not fq_file_name.endswith('.txt'):
-        with open(fq_file_name, 'rb') as f:
-            content = f.read()
-            lines = content.splitlines()
-            for line in lines:
-                res_idx = len(http_responses) - 1
-                try:
-                    str_line = line.decode()
-                    if 'HTTP/1.1' in str_line:
-                        idx = str_line.index('HTTP/1.1')
-                        if idx > 0:
-                            http_responses[res_idx]['response_headers'] += str_line[:idx]
-                        http_responses.append(
-                            {'response_code': str_line[idx:], 'response_headers': '', 'response_bytes': ''})
-                    else:
-                        http_responses[res_idx]['response_headers'] += str_line
-                except UnicodeDecodeError as ude:
-                    if b'HTTP/1.1' in line:
-                        idx = line.index(b'HTTP/1.1')
-                        if idx > 0:
-                            http_responses[res_idx]['response_bytes'] += str(line[:idx])
-                        http_responses.append(
-                            {'response_code': line[idx:].decode(), 'response_headers': '', 'response_bytes': ''})
-                    else:
-                        http_responses[res_idx]['response_bytes'] += str(line)
+    with open(fq_file_name, 'rb') as f:
+        content = f.read()
+        lines = content.splitlines()
+        for line in lines:
+            res_idx = len(http_responses) - 1
+            try:
+                str_line = line.decode()
+                if 'HTTP/1.1' in str_line:
+                    idx = str_line.index('HTTP/1.1')
+                    if idx > 0:
+                        http_responses[res_idx]['response_headers'] += str_line[:idx]
+                    http_responses.append(
+                        {'response_line': str_line[idx:], 'response_headers': '', 'response_bytes': ''})
+                else:
+                    http_responses[res_idx]['response_headers'] += str_line
+            except UnicodeDecodeError as ude:
+                if b'HTTP/1.1' in line:
+                    idx = line.index(b'HTTP/1.1')
+                    if idx > 0:
+                        http_responses[res_idx]['response_bytes'] += str(line[:idx])
+                    http_responses.append(
+                        {'response_line': line[idx:].decode(), 'response_headers': '', 'response_bytes': ''})
+                else:
+                    http_responses[res_idx]['response_bytes'] += str(line)
     return http_responses
+
+
+def convert_to_resp_filename(file_name):
+    file_name_segments = file_name.split("-")
+    opt_suffix = ''
+    # handle cases where the file name contains suffixes like c1, c2, etc
+    if 'c' in file_name_segments[1]:
+        split_suffix = file_name_segments[1].split('c')
+        file_name_segments[1] = split_suffix[0]
+        opt_suffix = 'c' + split_suffix[1]
+    resp_file_name = f'{file_name_segments[1]}-{file_name_segments[0]}{opt_suffix}'
+    return resp_file_name
 
 
 def extract_http_interaction(root_dir, file_name):
     fq_filename = os.path.join(root_dir, file_name)
-    filtered_ports = [port for port in watch_ports if (port in fq_filename)]
+    filtered_ports = [port for port in watch_server_ports if (port in fq_filename)]
     if len(filtered_ports) > 0:
-        from_port, to_port = extract_port_numbers(file_name)
-        if str(from_port) in watch_ports:
-            responses = process_response_file(root_dir, file_name)
-            process_tcpflow_filter.filter(responses, from_port, False)
-            for resp in responses:
-                print(resp)
-        if str(to_port) in watch_ports:
-            reqs = process_request_file(root_dir, file_name)
-            process_tcpflow_filter.filter(reqs, to_port, True)
-            for req in reqs:
-                print(req)
+        # only process request/response files initially
+        if not file_name.endswith('.html') and not file_name.endswith('.txt'):
+            from_port, to_port = extract_port_numbers(file_name)
+            # communication from server to client are responses
+            if str(from_port) in watch_server_ports:
+                responses = process_response_file(root_dir, file_name)
+                if responses is not None and len(responses) > 0:
+                    process_tcpflow_filter.filter(responses, from_port, False)
+                    return file_name, responses
+            # communication from client to server are requests
+            if str(to_port) in watch_server_ports:
+                reqs = process_request_file(root_dir, file_name)
+                if reqs is not None and len(reqs) > 0:
+                    process_tcpflow_filter.filter(reqs, to_port, True)
+                    rev_file_name = convert_to_resp_filename(file_name)
+                    return rev_file_name, reqs
+    return '', []
 
 
 def main():
+    http_interactions = []
+    bind_table = {}
     for root_dir, dirs, files in os.walk(flow_root_dir):
         for file_name in files:
-            extract_http_interaction(root_dir, file_name)
+            key, http_items = extract_http_interaction(root_dir, file_name)
+            if key:
+                if key in bind_table.keys():
+                    items = bind_table[key]
+                    for i in range(0, len(items)):
+                        if 'request_line' in items[i].keys():
+                            http_interactions.append({'request': items[i], 'response': http_items[i]})
+                        elif 'response_line' in items[i].keys():
+                            http_interactions.append({'request': http_items[i], 'response': items[i]})
+                else:
+                    bind_table[key] = http_items
+    for http_interaction in http_interactions:
+        print(http_interaction)
 
 
 if __name__ == '__main__':
