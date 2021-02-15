@@ -69,11 +69,11 @@ def process_response_file(root_dir, file_name):
                 if 'HTTP/1.1' in str_line:
                     idx = str_line.index('HTTP/1.1')
                     if idx > 0:
-                        http_responses[res_idx]['response_headers'] += str_line[:idx]
+                        http_responses[res_idx]['response_headers'] += f'{str_line[:idx]};'
                     http_responses.append(
                         {'response_line': str_line[idx:], 'response_headers': '', 'response_bytes': ''})
                 else:
-                    http_responses[res_idx]['response_headers'] += str_line
+                    http_responses[res_idx]['response_headers'] += f'{str_line};'
             except UnicodeDecodeError as ude:
                 if b'HTTP/1.1' in line:
                     idx = line.index(b'HTTP/1.1')
@@ -103,41 +103,50 @@ def extract_http_interaction(root_dir, file_name):
     filtered_ports = [port for port in watch_server_ports if (port in fq_filename)]
     if len(filtered_ports) > 0:
         # only process request/response files initially
-        if not file_name.endswith('.html') and not file_name.endswith('.txt'):
-            from_port, to_port = extract_port_numbers(file_name)
-            # communication from server to client are responses
-            if str(from_port) in watch_server_ports:
-                responses = process_response_file(root_dir, file_name)
-                if responses is not None and len(responses) > 0:
-                    process_tcpflow_filter.filter(responses, from_port, False)
-                    return file_name, responses
-            # communication from client to server are requests
-            if str(to_port) in watch_server_ports:
-                reqs = process_request_file(root_dir, file_name)
-                if reqs is not None and len(reqs) > 0:
-                    process_tcpflow_filter.filter(reqs, to_port, True)
-                    rev_file_name = convert_to_resp_filename(file_name)
-                    return rev_file_name, reqs
+        from_port, to_port = extract_port_numbers(file_name)
+        # communication from server to client are responses
+        if str(from_port) in watch_server_ports:
+            responses = process_response_file(root_dir, file_name)
+            if responses is not None and len(responses) > 0:
+                process_tcpflow_filter.filter(responses, from_port, False)
+                return file_name, responses
+        # communication from client to server are requests
+        if str(to_port) in watch_server_ports:
+            reqs = process_request_file(root_dir, file_name)
+            if reqs is not None and len(reqs) > 0:
+                process_tcpflow_filter.filter(reqs, to_port, True)
+                rev_file_name = convert_to_resp_filename(file_name)
+                return rev_file_name, reqs
     return '', []
 
 
 def main():
-    http_interactions = []
+    interactions = []
     bind_table = {}
     for root_dir, dirs, files in os.walk(flow_root_dir):
         for file_name in files:
-            key, http_items = extract_http_interaction(root_dir, file_name)
-            if key:
-                if key in bind_table.keys():
-                    items = bind_table[key]
-                    for i in range(0, len(items)):
-                        if 'request_line' in items[i].keys():
-                            http_interactions.append({'request': items[i], 'response': http_items[i]})
-                        elif 'response_line' in items[i].keys():
-                            http_interactions.append({'request': http_items[i], 'response': items[i]})
-                else:
-                    bind_table[key] = http_items
-    for http_interaction in http_interactions:
+            if not file_name.endswith('.html') and not file_name.endswith('.txt'):
+                key, http_items = extract_http_interaction(root_dir, file_name)
+                if key:
+                    if key in bind_table.keys():
+                        items = bind_table[key]
+                        for i in range(0, len(items)):
+                            if 'request_line' in items[i].keys():
+                                interactions.append(
+                                    {'interaction_id': key, 'request': items[i], 'response': http_items[i]})
+                            elif 'response_line' in items[i].keys():
+                                interactions.append(
+                                    {'interaction_id': key, 'request': http_items[i], 'response': items[i]})
+                    else:
+                        bind_table[key] = http_items
+            else:
+                with open(os.path.join(root_dir, file_name), 'r') as f:
+                    content = f.read()
+                    file_name_frags = file_name.split("-")
+                    identifier = f'{file_name_frags[0]}-{file_name_frags[1]}'
+                    interactions.append({'interaction_id': identifier, 'type': file_name[file_name.rindex('.') + 1:],
+                                         'content': content})
+    for http_interaction in interactions:
         print(http_interaction)
 
 
