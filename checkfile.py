@@ -1,7 +1,6 @@
 import sys
 
-def Analyze():
-    
+def Analyze():    
     path = sys.argv[1]
     if len(sys.argv) < 2:
         print("Input the path file")
@@ -24,12 +23,25 @@ def asm_check(path):
 
 def c_check(path):
     keyword=["printf", "sprintf", "strcpy", "gets", "fgets", "puts", "execlp", "system", "strcpy",
-                             "strcmp", "argv", "execvp", "File", "sleep", "memcpy" ]
+                             "strcmp","execvp", "File", "sleep", "memcpy","strncat" ,"scanf"]
     dict={
-        "printf":"path vulnerability",
-        "sprintf":"string vulnerability"
+         "printf":"Overflowing Function vulnerability",
+         "sprintf":"Overflowing Function vulnerability",
+         "strcpy":"Buffer overflow vulnerablity",
+         "gets":"Overflowing Function vulnerability", 
+         "fgets":"Overflowing Function Vulnerability",
+         "puts":"Overflowing Function Vulnerability",
+         "execlp":"Path Vulnerability", 
+         "system":"Command injection Vulnerablity", 
+         "strcmp":"Buffer overflow Vulnerability",
+         "execvp":"Path Vulnerability",
+         "File":"Function Vulnerablitiy",
+         "sleep":"Function Vulnerablity",
+         "memcpy":"Buffer Overflow Vulnerability",
+         "strncat":"Dot Dot vulnerablity",
+         "scanf":"Overflowing Function Vulnerability",
+         "push":"Stack Vulnerability"
     }
-    print("Hello") 
     line_no = 1
     with open(path) as f:
         for line in f:
