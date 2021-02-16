@@ -6,7 +6,7 @@
 
 ### Capture/Filter traffic using tcpdump
 
-- `sudo tcpdump -i <interface> -s 65535 -w ${HERE}/out/tcpdump/capture-%s -G 15 -Z <user>`
+- `sudo tcpdump -i <interface> -s 65535 -w ./out/tcpdump/capture-%s -G 15 -Z $(whoami)`
 - `python3 ./process_tcpdump.py [<portnum1>,<portnum2>,...]`
 
 ### Capture tcpflow from tcpdump
@@ -16,7 +16,7 @@
 
 ### Process tcpflow capture
 
-- `chmod +x process_tcpflow.py && ./process_tcpflow.py`
+- `chmod u+x process_tcpflow.py && ./process_tcpflow.py`
 
 ## Test applications
 
@@ -27,3 +27,11 @@
 ## Python libraries
 
 - To get `file` command capability: https://github.com/ahupp/python-magic
+
+## Complete set of steps to capture HTTP traffic
+
+1. Run tcpdump to capture live
+   traffic: `sudo tcpdump -i <interface> -s 65535 -w ./out/tcpdump/capture-%s -G 15 -Z $(whoami)`
+2. Start mongodb: `docker-compose up -d`
+3. Start process_tcpflow.py: `chmod u+x process_tcpflow.py && ./process_tcpflow.py`
+4. Run tcpflow capture to interpret the captured tcpdump: `./tcp_flow.sh`

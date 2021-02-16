@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: library/mongo:3.6.22
+    container_name: wirescopedb
+    environment:
+      MONGO_INITDB_DATABASE: wirescope
+      MONGO_INITDB_ROOT_USERNAME: hackerteam9
+      MONGO_INITDB_ROOT_PASSWORD: scanwire24x7
+    volumes:
+      - ./.mongo/data:/data/db
+    ports:
+      - '27017:27017'

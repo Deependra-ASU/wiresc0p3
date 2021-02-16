@@ -2,11 +2,15 @@
 
 import os
 import re
+import time
+import ntpath
+import mongo_connect
 import process_tcpflow_filter
+from watchdog.observers import Observer
+from watchdog.events import PatternMatchingEventHandler
 
 # list all the server ports that we want to watch
 watch_server_ports = ['8090']
-
 curr_dir = os.path.dirname(os.path.realpath(__file__))
 flow_root_dir = f'{curr_dir}/out/tcpflow'
 
@@ -70,8 +74,8 @@ def process_response_file(root_dir, file_name):
                     idx = str_line.index('HTTP/1.1')
                     if idx > 0:
                         http_responses[res_idx]['response_headers'] += f'{str_line[:idx]};'
-                    http_responses.append(
-                        {'response_line': str_line[idx:], 'response_headers': '', 'response_bytes': ''})
+                    resp = {'response_line': str_line[idx:], 'response_headers': '', 'response_bytes': ''}
+                    http_responses.append(resp)
                 else:
                     http_responses[res_idx]['response_headers'] += f'{str_line};'
             except UnicodeDecodeError as ude:
@@ -79,8 +83,8 @@ def process_response_file(root_dir, file_name):
                     idx = line.index(b'HTTP/1.1')
                     if idx > 0:
                         http_responses[res_idx]['response_bytes'] += str(line[:idx])
-                    http_responses.append(
-                        {'response_line': line[idx:].decode(), 'response_headers': '', 'response_bytes': ''})
+                    resp = {'response_line': line[idx:].decode(), 'response_headers': '', 'response_bytes': ''}
+                    http_responses.append(resp)
                 else:
                     http_responses[res_idx]['response_bytes'] += str(line)
     return http_responses
@@ -120,35 +124,47 @@ def extract_http_interaction(root_dir, file_name):
     return '', []
 
 
-def main():
-    interactions = []
-    bind_table = {}
-    for root_dir, dirs, files in os.walk(flow_root_dir):
-        for file_name in files:
-            if not file_name.endswith('.html') and not file_name.endswith('.txt'):
-                key, http_items = extract_http_interaction(root_dir, file_name)
-                if key:
-                    if key in bind_table.keys():
-                        items = bind_table[key]
-                        for i in range(0, len(items)):
-                            if 'request_line' in items[i].keys():
-                                interactions.append(
-                                    {'interaction_id': key, 'request': items[i], 'response': http_items[i]})
-                            elif 'response_line' in items[i].keys():
-                                interactions.append(
-                                    {'interaction_id': key, 'request': http_items[i], 'response': items[i]})
-                    else:
-                        bind_table[key] = http_items
-            else:
-                with open(os.path.join(root_dir, file_name), 'r') as f:
-                    content = f.read()
-                    file_name_frags = file_name.split("-")
-                    identifier = f'{file_name_frags[0]}-{file_name_frags[1]}'
-                    interactions.append({'interaction_id': identifier, 'type': file_name[file_name.rindex('.') + 1:],
-                                         'content': content})
-    for http_interaction in interactions:
-        print(http_interaction)
+def process_tcpflow_file(event):
+    fq_file_name = event.src_path
+    if os.path.isfile(fq_file_name) and not str(fq_file_name).endswith('report.xml'):
+        root_dir, file_name = ntpath.split(fq_file_name)
+        if 'HTTPBODY' not in file_name:
+            key, http_items = extract_http_interaction(root_dir, file_name)
+            interaction_count = mongo_connect.count_interactions_by_id(key)
+            for http_item in http_items:
+                # no interaction saved in database
+                if interaction_count == 0:
+                    if 'request_line' in http_item:
+                        mongo_connect.save_interaction({'interaction_id': key, 'request': http_item})
+                    elif 'response_line' in http_item:
+                        mongo_connect.save_interaction({'interaction_id': key, 'response': http_item})
+                else:
+                    saved_interactions = mongo_connect.get_interactions_by_id(key)
+                    for saved_interaction in saved_interactions:
+                        if 'request' in saved_interaction and 'response_line' in http_item:
+                            mongo_connect.update_interaction(saved_interaction['_id'], {'response': http_item})
+                        elif 'response' in saved_interaction and 'request_line' in http_item:
+                            mongo_connect.update_interaction(saved_interaction['_id'], {'request': http_item})
+        else:
+            with open(os.path.join(root_dir, file_name), 'rb') as f:
+                content = f.read()
+                file_name_frags = file_name.split("-")
+                identifier = f'{file_name_frags[0]}-{file_name_frags[1]}'
+                file_type = file_name[file_name.rindex('.') + 1:]
+                interaction = {'interaction_id': identifier, 'type': file_type, 'content': content}
+                mongo_connect.save_interaction(interaction)
 
 
 if __name__ == '__main__':
-    main()
+    tcpflow_event_handler = PatternMatchingEventHandler("*", "", False, True)
+    tcpflow_event_handler.on_created = process_tcpflow_file
+
+    tcpflow_observer = Observer()
+    tcpflow_observer.schedule(tcpflow_event_handler, flow_root_dir, recursive=True)
+    tcpflow_observer.start()
+    try:
+        while True:
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        tcpflow_observer.stop()
+    tcpflow_observer.join()
