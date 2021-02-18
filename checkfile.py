@@ -1,11 +1,25 @@
 import sys
+import os
+import os.path
 
-def Analyze():    
+data_folder=sys.argv[1]
+
+def Folder_walk():
     path = sys.argv[1]
+    #print(path)
     if len(sys.argv) < 2:
         print("Input the path file")
         exit(1)
-    if ".c" in path:
+    if os.path.isfile(path):
+        Analyze(path)
+    else:
+        contents = os.listdir(path) # read the contents of dir
+        for item in contents:      # loop over those contents
+                Analyze(item) 
+
+def Analyze(path):    
+    #print(path)
+    if ".py" in path:
         c_check(path)
     if ".asm" in path:
         asm_check(path)    
@@ -22,8 +36,9 @@ def asm_check(path):
             line_no+=1 
 
 def c_check(path):
+    #print(path)
     keyword=["printf", "sprintf", "strcpy", "gets", "fgets", "puts", "execlp", "system", "strcpy",
-                             "strcmp","execvp", "File", "sleep", "memcpy","strncat" ,"scanf"]
+                             "strcmp","execvp", "File", "sleep", "memcpy","strncat" ,"scanf", "push"]
     dict={
          "printf":"Overflowing Function vulnerability",
          "sprintf":"Overflowing Function vulnerability",
@@ -42,8 +57,15 @@ def c_check(path):
          "scanf":"Overflowing Function Vulnerability",
          "push":"Stack Vulnerability"
     }
+    #print("Hello") 
     line_no = 1
-    with open(path) as f:
+    #print(folder)
+    if os.path.isfile(path):
+        file_to_open = path
+    else: 
+        file_to_open = os.path.join(data_folder, path)
+    print(file_to_open)
+    with open(file_to_open) as f:
         for line in f:
             for i in keyword:
                 if i in line:
@@ -51,4 +73,4 @@ def c_check(path):
             line_no+=1        
             
 
-Analyze()
+Folder_walk()
