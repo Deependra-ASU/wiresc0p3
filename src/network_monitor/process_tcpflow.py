@@ -10,10 +10,9 @@ from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
 
 # list all the server ports that we want to watch
-watch_server_ports = [8090, 10001]
+watch_server_ports = [10001, 10002, 10003, 10004]
 curr_dir = os.path.dirname(os.path.realpath(__file__))
 flow_root_dir = f'{curr_dir}/out/tcpflow'
-flow_archives = f'{curr_dir}/out/tcpflow-archives'
 
 
 def extract_port_numbers(file_name):
@@ -30,36 +29,39 @@ def process_request_file(root_dir, file_name):
     print(f'processing request file: {file_name}')
     requests = []
     with open(fq_file_name, 'r') as f:
-        content = f.read()
-        if 'HTTP/1.1' in content:
-            lines = content.splitlines()
-            req_body = ''
-            for line in lines:
-                # append new requests to the end of the list
-                req_idx = len(requests) - 1
-                if len(line) > 0:
-                    http_header_matches = re.finditer("(GET|HEAD|POST|PUT|DELETE) /", line)
-                    http_header_found = False
-                    header_found_index = 0
-                    # request line which contains the http method marks the beginning of the request
-                    for http_header_match in http_header_matches:
-                        http_header_found = True
-                        header_found_index = http_header_match.start(0)
-                    if http_header_found:
-                        # handle requests where http method is not at index 0 of line
-                        if header_found_index > 0:
-                            req_body = line[:header_found_index]
-                            requests.append({'request_line': line[header_found_index:]})
+        try:
+            content = f.read()
+            if 'HTTP/1.1' in content:
+                lines = content.splitlines()
+                req_body = ''
+                for line in lines:
+                    # append new requests to the end of the list
+                    req_idx = len(requests) - 1
+                    if len(line) > 0:
+                        http_header_matches = re.finditer("(GET|HEAD|POST|PUT|DELETE) /", line)
+                        http_header_found = False
+                        header_found_index = 0
+                        # request line which contains the http method marks the beginning of the request
+                        for http_header_match in http_header_matches:
+                            http_header_found = True
+                            header_found_index = http_header_match.start(0)
+                        if http_header_found:
+                            # handle requests where http method is not at index 0 of line
+                            if header_found_index > 0:
+                                req_body = line[:header_found_index]
+                                requests.append({'request_line': line[header_found_index:]})
+                            else:
+                                requests.append({'request_line': line})
                         else:
-                            requests.append({'request_line': line})
+                            req_body = line
+                    if ':' in req_body:
+                        requests[req_idx]['headers'] = req_body
                     else:
-                        req_body = line
-                if ':' in req_body:
-                    requests[req_idx]['headers'] = req_body
-                else:
-                    requests[req_idx]['payload'] = req_body
-        else:
-            requests.append({'request_line': content})
+                        requests[req_idx]['payload'] = req_body
+            else:
+                requests.append({'request_line': content})
+        except UnicodeDecodeError as err:
+            print('could not decode request')
 
     return requests
 
@@ -179,7 +181,7 @@ if __name__ == '__main__':
     tcpflow_observer.schedule(tcpflow_event_handler, flow_root_dir, recursive=True)
     tcpflow_observer.start()
     try:
-        print('Start observing tcpflow files...')
+        print('Start processing tcpflow files...')
         while True:
             time.sleep(0.5)
     except KeyboardInterrupt:

@@ -35,8 +35,11 @@
 2. Start mongodb: `docker-compose up -d`
 3. Start process_tcpflow.py: `chmod u+x process_tcpflow.py && ./process_tcpflow.py`
 4. Run tcpflow capture to interpret the captured tcpdump: `./tcp_flow.sh`
+5. Copy tcpdump to local incrementally: `rsync -avzhe ssh ctf@34.208.182.250:~/src/network_monitor/out/tcpdump/* ./out/tcpdump`
 
 ## References
 
 - http://thepythoncorner.com/dev/how-to-create-a-watchdog-in-python-to-look-for-filesystem-changes/
 - https://www.systutorials.com/docs/linux/man/1-tcpflow/
+
+rsync -avzhe ssh root@192.168.0.100:/root/install.log /tmp/
