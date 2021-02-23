@@ -16,6 +16,13 @@ flow_root_dir = f'{curr_dir}/out/tcpflow'
 
 
 def extract_port_numbers(file_name):
+    """
+    This method extracts the port numbers from the file name. Tcpflow files are named with the following format:
+    <from-ip>.<from-port>-<to-ip>.<to-port><optional-diff-segments>
+
+    :param file_name: The file name to extract port numbers
+    :return: the from and to port number.
+    """
     file_name_segments = file_name.split("-")
     from_port = int(file_name_segments[0][len(file_name_segments[0]) - 5:])
     if 'c' in file_name_segments[1]:
@@ -25,6 +32,14 @@ def extract_port_numbers(file_name):
 
 
 def process_request_file(root_dir, file_name):
+    """
+    This method processes the request file. Request files could be ASCII or binary. Requests could be HTTP requests or
+    TCP requests in case of remote command-line interaction.
+
+    :param root_dir: Folder which contains all the tcpflow output
+    :param file_name: Name of the file to be processed
+    :return: Array of request dictionary
+    """
     fq_file_name = os.path.join(root_dir, file_name)
     print(f'processing request file: {file_name}')
     requests = []
@@ -62,11 +77,18 @@ def process_request_file(root_dir, file_name):
                 requests.append({'request_line': content})
         except UnicodeDecodeError as err:
             print('could not decode request')
-
     return requests
 
 
 def process_response_file(root_dir, file_name):
+    """
+    This method processes the response file. Response files could be ASCII or binary. Responses could be HTTP responses
+    or TCP responses(in case of binary hacking applications using socat).
+
+    :param root_dir: Folder which contains all the tcpflow output
+    :param file_name: Name of the file to be processed
+    :return: Array of response dictionary.
+    """
     fq_file_name = os.path.join(root_dir, file_name)
     print(f'processing response file {file_name}...')
     responses = []
@@ -104,6 +126,13 @@ def process_response_file(root_dir, file_name):
 
 
 def convert_to_resp_filename(file_name):
+    """
+    Since we want a consistent identifier to group interactions/exchanges between a specific server and client, we flip
+    the name of the response file so that it resembles the request file name.
+
+    :param file_name: the name of the response file
+    :return: reverse of the response file such that it resembles the request file
+    """
     file_name_segments = file_name.split("-")
     opt_suffix = ''
     # handle cases where the file name contains suffixes like c1, c2, etc
@@ -116,6 +145,13 @@ def convert_to_resp_filename(file_name):
 
 
 def extract_interaction(root_dir, file_name):
+    """
+    For HTTP or TCP exchange/interaction extract request/response.
+
+    :param root_dir: The directory under which all the tcpflow files are located.
+    :param file_name: The name of the file being processed.
+    :return: a key to identify this interaction/exchange, a set of requests/responses found from the tcpflow output.
+    """
     # only process request/response files initially
     from_port, to_port = extract_port_numbers(file_name)
     # communication from server to client are responses
@@ -137,6 +173,15 @@ def extract_interaction(root_dir, file_name):
 
 
 def process_tcpflow_file(event):
+    """
+    The watchdog observer watches the './out/tcpflow' for incoming traffic and calls this method whenever a new file is
+    created. Once the file "create event" is received this method would extract individual requests, responses or
+    response body from the file and save it as a record in MongoDB. This has been designed such that any of the parts
+    could be individually extracted and gradually put together to form a complete exchange/interaction.
+
+    :param event: "create file" event
+    :return: None
+    """
     fq_file_name = event.src_path
     if os.path.isfile(fq_file_name) and not str(fq_file_name).endswith('report.xml'):
         root_dir, file_name = ntpath.split(fq_file_name)
