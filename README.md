@@ -1,45 +1,36 @@
 # Wiresc0p3
 
-## Setup
+## Network Monitor
 
-- List active interfaces: `netstat -i`
+The network monitor is responsible for monitoring network calls and processing them into cohesive TCP exchange entries.
 
-### Capture/Filter traffic using tcpdump
+Source: src/network_monitor
 
-- `sudo tcpdump -i <interface> -s 65535 -w ./out/tcpdump/capture-%s -G 15 -Z $(whoami)`
-- `python3 ./process_tcpdump.py [<portnum1>,<portnum2>,...]`
+### Setup
 
-### Capture tcpflow from tcpdump
+- Requires MongoDB, install locally using `docker-compose up -d`.
+- Install [MongoDB](https://www.mongodb.com/products/compass) Compass to view the database and perform queries.
 
-- `sudo tcpdump -s 65535 -w out/tcpdump/output.pcap -C 1 -W 2 -Z root`
-- `./tcp_flow.sh`
+### Usage
 
-### Process tcpflow capture
+_Note: It is assumed that you are in the ./network_monitor path when executing the following commands._
+- Start the `process_tcpflow.py` script. This will start a file listener looking for new files in `./out/tcpflow/`.
+- Find the interface you want to listen on `netstat -i`.
+- Run tcpdump `sudo tcpdump -i <interface> -s 65535 -w ./out/tcpdump/capture-%s -G 60 -Z $(whoami)`.
+- Run tcpflow bash script `./tcp_flow.sh`.
 
-- `chmod u+x process_tcpflow.py && ./process_tcpflow.py`
+The tcpflow script can be executed periodically using a [cronjob](https://man7.org/linux/man-pages/man5/crontab.5.html).
 
-## Test applications
+### Test application
 
+We used a sample web application with vulnerabilities called [damn vulnerable web application](https://dvwa.co.uk/).
 - Start sample web application: `docker run --name webapp --rm -itd -p 8090:80 vulnerables/web-dvwa`
 - Stop sample web application: `docker stop webapp`
 - Look at the logs of the docker: `docker logs webapp`
 
-## Python libraries
-
-- To get `file` command capability: https://github.com/ahupp/python-magic
-
-## Complete set of steps to capture HTTP traffic
-
-1. Run tcpdump to capture live
-   traffic: `sudo tcpdump -i <interface> -s 65535 -w ./out/tcpdump/capture-%s -G 15 -Z $(whoami)`
-2. Start mongodb: `docker-compose up -d`
-3. Start process_tcpflow.py: `chmod u+x process_tcpflow.py && ./process_tcpflow.py`
-4. Run tcpflow capture to interpret the captured tcpdump: `./tcp_flow.sh`
-5. Copy tcpdump to local incrementally: `rsync -avzhe ssh ctf@34.208.182.250:~/src/network_monitor/out/tcpdump/* ./out/tcpdump`
-
-## References
+### References
 
 - http://thepythoncorner.com/dev/how-to-create-a-watchdog-in-python-to-look-for-filesystem-changes/
+- https://linux.die.net/man/8/tcpdump
 - https://www.systutorials.com/docs/linux/man/1-tcpflow/
-
-rsync -avzhe ssh root@192.168.0.100:/root/install.log /tmp/
+- https://docs.mongodb.com/manual/
