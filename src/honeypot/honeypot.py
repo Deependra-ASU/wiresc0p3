@@ -1,9 +1,9 @@
 import socket
 import atexit
-
+import sys
 # Local IP/Port for the honeypot to listen on (TCP)
 LHOST = '0.0.0.0'
-LPORT = 23
+LPORT = int(sys.argv[1])
 
 TIMEOUT = 10
 
