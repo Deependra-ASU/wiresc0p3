@@ -1,6 +1,6 @@
 ## File Analyzer
 
-This tool is used to scan C files to find Vulnerablilites in them.
+This tool is used to scan C files to find Vulnerablilites in them.It works by scanning file in line by line fashion.
 
 ## Usage
 
